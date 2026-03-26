@@ -1,14 +1,57 @@
-# Name
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use App::mal;
+use Getopt::Long qw(:config no_ignore_case);
+use Pod::Usage;
+
+our $VERSION = '0.01';
+
+exit main();
+
+sub main {
+    my $quiet = ( -t STDOUT ? 0 : 1 );
+    my ( $version, $verbose );
+
+    GetOptions(
+        'help|h'    => sub { pod2usage(0) },
+        'quiet|q'   => \$quiet,
+        'version|V' => \$version,
+        'verbose|v' => \$verbose,
+    ) or pod2usage( { -message => "Invalid options", -exitstatus => 1 } );
+
+    $quiet = 0 if $verbose;
+
+    # show version
+    if ($version) {
+        say $VERSION;
+        return 0;
+    }
+    my $cmd        = shift(@ARGV) or pod2usage(1);
+    my $mal        = App::mal->new;
+    my $cmd_method = "cmd_$cmd";
+    pod2usage( { -message => "Unknown command: $cmd", -exitstatus => 1 } )
+        unless $mal->can($cmd_method);
+    $mal->$cmd_method(@ARGV);
+
+    return 0;
+}
+
+__END__
+
+=head1 NAME
 
 mal - memory and language command-line tool
 
-# Synopsis
+=head1 SYNOPSIS
 
     mal init
-    mal add -f README.md -f lib/App/mal.pm 'scaffolding new project'
+    mal add 'scaffolding new project' README.md lib/App/mal.pm
     mal prompt 'describe this software'
     mal prompt -t 0.9 -p 0.3 'describe this software'
-    mal patch 'check if README.md is up to date with mal.pm'
+    mal patch 'check if README.md is up to date with mal.pm' README.md lib/*
     mal explain README.md
     mal test
     mal proofread README.md
@@ -17,9 +60,9 @@ mal - memory and language command-line tool
     mal clean
     mal config
 
-# Description
+=head1 DESCRIPTION
 
-`mal` is a command-line program to update or patch local files based on
+C<mal> is a command-line program to update or patch local files based on
 a user prompt. It operates on the current folder and its subfolders
 and stores context associated with them.
 
@@ -27,16 +70,16 @@ The tool builds structured prompts from Markdown context files and
 executes LLM-assisted actions such as explaining code, generating patches,
 testing programs, or proofreading documentation.
 
-# Configuration
+=head2 Configuration
 
-`.mal` folder contains:
+C<.mal> folder contains:
 
     - config.ini
     - context.md
 
-### config.ini
+=head3 config.ini
 
-Here are `config.ini` sections and configuration options:
+Here are C<config.ini> sections and configuration options:
 
     - general
         - llm_api: ollama
@@ -47,9 +90,9 @@ Here are `config.ini` sections and configuration options:
         - url: http://localhost:8080/v1
         - model: gemma3n:e2b
 
-### context.md
+=head3 context.md
 
-Here are the `context.md` sections and subsections:
+Here are the C<context.md> sections and subsections:
 
     - roles
         - assistant
@@ -85,26 +128,26 @@ Here are the `context.md` sections and subsections:
     - evaluation
         - tests
 
-## How context is built
+=head2 How context is built
 
-The current folder, all parent folders, and `$HOME` are scanned for a `.mal`
-folder, based on the information inside them.
+The current folder, all parent folders, and C<$HOME> are scanned for a
+C<.mal> folder, based on the information inside them.
 
-All `config.ini` files are merged and duplicate values are replaced. If a value is empty,
-the key is removed during parsing.
+All C<config.ini> files are merged and duplicate values are replaced. If a
+value is empty, the key is removed during parsing.
 
-The following rules apply when merging `context.md` files:
+The following rules apply when merging C<context.md> files:
 
-    - merging begins from parent to child (e.g. from `$HOME` to `.`)
+    - merging begins from parent to child (e.g. from C<$HOME> to C<.>)
     - all sections and subsections without text are removed
         - if a (sub)section of a sibling has text, it is completely replaced
     - if a (sub)section of a sibling has additional (sub)subsections, they
-      are either replaced or appended at the end; the parent section text
-      is kept
+      are either replaced or appended at the end; the parent section text is
+      kept
 
 The context is summarized automatically when exceeding limits.
 
-# Command Context Files
+=head2 Command Context Files
 
 Each subcommand may have its own prompt template stored as Markdown.
 
@@ -120,12 +163,12 @@ These files define how the LLM should behave for a specific command.
 
 When a command is executed, the prompt is constructed from:
 
-1. global `context.md`
-2. parent folder contexts
-3. command-specific context file (e.g. `explain.md`)
-4. timeline entries
-5. user prompt
-6. current date and time
+    1. global C<context.md>
+    2. parent folder contexts
+    3. command-specific context file (e.g. C<explain.md>)
+    4. timeline entries
+    5. user prompt
+    6. current date and time
 
 Example prompt hierarchy:
 
@@ -134,16 +177,16 @@ Example prompt hierarchy:
     project/.mal/explain.md
     user prompt
 
-This allows commands to specialize behaviour without modifying the
-global prompt context.
+This allows commands to specialize behaviour without modifying the global
+prompt context.
 
 Each subcommand can pre-process the prompt and post-process the response.
 
-# Command Permissions
+=head2 Command Permissions
 
 Some commands may execute local tools in order to collect information.
 
-For security reasons, every command has a list of **allowed CLI tools**.
+For security reasons, every command has a list of allowed CLI tools.
 
 Example configuration:
 
@@ -158,7 +201,7 @@ Example configuration:
 
 Example behaviour:
 
-`mal explain`
+C<mal explain>
 
 May execute:
 
@@ -166,15 +209,15 @@ May execute:
 
 to search the code base.
 
-`mal test`
+C<mal test>
 
 May run tests or programs in order to analyse output.
 
 This design prevents arbitrary shell execution by the LLM.
 
-# Safety Model
+=head2 Safety Model
 
-`mal` will only modify files that are explicitly part of the working
+C<mal> will only modify files that are explicitly part of the working
 directory and that were provided as context.
 
 Recommended restrictions:
@@ -185,24 +228,23 @@ Recommended restrictions:
 
 All changes should be shown as patches unless explicitly auto-applied.
 
-# Command-line syntax
+=head2 Command-line syntax
 
 Here are the subcommands and their arguments:
 
-## init
+=head3 init
 
-Creates a `.mal` folder and populates it with a basic context Markdown
-file.
+Creates a C<.mal> folder and populates it with a basic context Markdown file.
 
-On the first run on a computer it will also create `.mal` in the `$HOME` folder
-and notify the user that this base context file should be edited.
+On the first run on a computer it will also create C<.mal> in the C<$HOME>
+folder and notify the user that this base context file should be edited.
 
-## add
+=head3 add
 
 Adds more context that will be stored for future prompts.
 
-Each entry is automatically timestamped with the current date and time
-and appended to `timeline.md`.
+Each entry is automatically timestamped with the current date and time and
+appended to C<timeline.md>.
 
 Example:
 
@@ -212,32 +254,33 @@ Result in timeline:
 
     2026-03-15 10:21 initial project scaffolding
 
-## prompt
+=head3 prompt
 
-Builds the current context (see section "How context is built") and
-prompts the LLM to generate a response.
+Builds the current context (see section "How context is built") and prompts
+the LLM to generate a response.
 
 Options:
 
-    - `-t` temperature
-    - `-p` top_p
+    -t    temperature
+    -p    top_p
 
-## patch
+=head3 patch
 
-Builds the current context (see section "How context is built") and
-prompts the LLM to generate a response that produces unified diff
-patches for files in the current folder.
+Builds the current context (see section "How context is built") and prompts
+the LLM to generate a response that produces unified diff patches for files
+in the current folder.
 
-    - `-y` will auto-apply all patches
-    - `-n` will not apply patches even if auto-apply is enabled in `config.ini`
+    - C<-y> will auto-apply all patches
+    - C<-n> will not apply patches even if auto-apply is enabled in
+      C<config.ini>
 
-## explain
+=head3 explain
 
 Explains files or code inside the current project.
 
 Typical behaviour:
 
-    - search the repository using tools like `grep`
+    - search the repository using tools like C<grep>
     - collect relevant files
     - generate a technical explanation
 
@@ -245,13 +288,13 @@ Example:
 
     mal explain lib/App/mal.pm
 
-## test
+=head3 test
 
 Runs project tests and lets the LLM analyse the results.
 
 Typical workflow:
 
-    1. run test command (e.g. `prove`, `make test`)
+    1. run test command (e.g. C<prove>, C<make test>)
     2. capture output
     3. ask the LLM to interpret failures
     4. optionally propose patches
@@ -260,7 +303,7 @@ Example:
 
     mal test
 
-## proofread
+=head3 proofread
 
 Reads documentation or source files and improves:
 
@@ -276,13 +319,13 @@ Example:
 
     mal proofread README.md
 
-## todo
+=head3 todo
 
 Maintains a project TODO list.
 
 Workflow:
 
-    1. read `todo.md` in the project root
+    1. read C<todo.md> in the project root
     2. search the repository for markers:
 
         TODO
@@ -297,33 +340,33 @@ Example:
 
     mal todo
 
-## show
+=head3 show
 
-Builds the current context (see section "How context is built") and
-prints it.
+Builds the current context (see section "How context is built") and prints
+it.
 
-With `-v` it will also include file content; otherwise file content is
+With C<-v> it will also include file content; otherwise file content is
 skipped.
 
-## clean
+=head3 clean
 
-Takes the current context, the built context, and prompts the LLM to consolidate
-the file so that only relevant information is kept, removing duplicates
-or inconsistencies.
+It will delete old conversation history older than
+C<general.chat_history_days>.
 
-It will also delete old conversation history older than `general.chat_history_days`.
+=head3 config
 
-## config
+Shows configuration as merged from all C<config.ini> files.
 
-Shows configuration as merged from all `config.ini` files.
+With C<-v> it will add file references in front of all text blocks to
+indicate where the information comes from.
 
-With `-v` it will add file references in front of all text blocks to indicate
-where the information comes from.
-
-# Design Goals
+=head2 Design Goals
 
     - structured prompting via Markdown
     - hierarchical context inheritance
     - command-specific prompting
     - safe interaction with local files
     - LLM-assisted file management
+
+=cut
+

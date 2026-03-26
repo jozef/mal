@@ -1,0 +1,9 @@
+Build.PL
+Changes
+lib/App/mal.pm
+lib/App/mal/Command/Init.pm
+MANIFEST			This list of files
+README
+script/mal
+META.yml
+META.json
